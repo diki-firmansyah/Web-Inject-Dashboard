@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebInject Dashboard — Instagram</title>
+  <meta name="description" content="Dashboard crawling & inject data Instagram post ke Kafka via URL/shortcode." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0d14;
+      --surface:   #111520;
+      --surface2:  #161b28;
+      --border:    rgba(255,255,255,.07);
+      --border2:   rgba(255,255,255,.12);
+      --accent:    #6366f1;
+      --accent2:   #818cf8;
+      --success:   #22d3a5;
+      --warn:      #f59e0b;
+      --error:     #f43f5e;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --muted2:    #94a3b8;
+      --glow:      rgba(99,102,241,.35);
+    }
+
+    html { font-size: 15px; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 99px; }
+
+    /* ── HEADER ── */
+    header {
+      padding: 0 2rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,13,20,.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      font-weight: 700;
+      font-size: 1.05rem;
+      letter-spacing: -.02em;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg,#6366f1,#ec4899);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .9rem;
+      box-shadow: 0 0 18px rgba(99,102,241,.5);
+    }
+    .header-badges { display: flex; gap: .5rem; align-items: center; }
+    .header-actions { display: flex; gap: .5rem; align-items: center; }
+    .badge {
+      padding: .2rem .65rem;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 600;
+      display: flex; align-items: center; gap: .35rem;
+      border: 1px solid;
+    }
+    .badge-dot { width:7px; height:7px; border-radius:50%; animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+    .badge.kafka  { color:#818cf8; border-color:rgba(129,140,248,.3); background:rgba(129,140,248,.07); }
+    .badge.mongo  { color:#22d3a5; border-color:rgba(34,211,165,.3); background:rgba(34,211,165,.07); }
+    .badge.kafka .badge-dot  { background:#818cf8; }
+    .badge.mongo .badge-dot  { background:#22d3a5; }
+    .badge.debug-badge.is-debug { color:#f59e0b; border-color:rgba(245,158,11,.3); background:rgba(245,158,11,.07); }
+    .badge.debug-badge.is-debug .badge-dot { background:#f59e0b; }
+    .badge.debug-badge.is-prod  { color:#22d3a5; border-color:rgba(34,211,165,.3); background:rgba(34,211,165,.07); }
+    .badge.debug-badge.is-prod  .badge-dot { background:#22d3a5; }
+
+    /* ── LAYOUT ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      grid-template-rows: auto 1fr;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ── TABS ── */
+    .tabs-wrap {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: .25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .35rem;
+      width: fit-content;
+    }
+    .tab-btn {
+      padding: .45rem 1.1rem;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: .85rem;
+      font-weight: 500;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,.05); }
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 16px var(--glow);
+    }
+
+    /* ── PANEL ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 0;
+    }
+    .panel-title {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .panel-title::before {
+      content: '';
+      display: block;
+      width: 3px; height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    /* ── FORMS ── */
+    label { font-size: .8rem; font-weight: 500; color: var(--muted2); display: block; margin-bottom: .35rem; }
+    textarea, input[type=text], input[type=number] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 9px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .82rem;
+      padding: .65rem .85rem;
+      resize: vertical;
+      transition: border .2s, box-shadow .2s;
+      outline: none;
+    }
+    textarea:focus, input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.18);
+    }
+    textarea.url-input { min-height: 130px; }
+    textarea.result-box { min-height: 280px; font-size: .78rem; line-height: 1.5; }
+    textarea.result-box.has-data { border-color: rgba(34,211,165,.3); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+      padding: .6rem 1.3rem;
+      border: none; border-radius: 9px;
+      font-family: inherit; font-size: .85rem; font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 0 rgba(99,102,241,0);
+    }
+    .btn-primary:not(:disabled):hover {
+      background: var(--accent2);
+      box-shadow: 0 4px 20px var(--glow);
+      transform: translateY(-1px);
+    }
+    .btn-success {
+      background: rgba(34,211,165,.15);
+      color: var(--success);
+      border: 1px solid rgba(34,211,165,.3);
+    }
+    .btn-success:not(:disabled):hover {
+      background: rgba(34,211,165,.25);
+      box-shadow: 0 4px 18px rgba(34,211,165,.2);
+      transform: translateY(-1px);
+    }
+    .btn-ghost {
+      background: rgba(255,255,255,.05);
+      color: var(--muted2);
+      border: 1px solid var(--border2);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,.09); color: var(--text); }
+    .btn-danger {
+      background: rgba(244,63,94,.12);
+      color: var(--error);
+      border: 1px solid rgba(244,63,94,.25);
+    }
+    .btn-danger:hover { background: rgba(244,63,94,.22); }
+
+    .btn-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+    /* ── SPINNER ── */
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: none;
+    }
+    .btn.loading .spinner { display: block; }
+    .btn.loading .btn-label { opacity: .6; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── STEP INDICATOR ── */
+    .steps {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: .25rem;
+    }
+    .step {
+      display: flex; align-items: center; gap: .45rem;
+      font-size: .78rem; font-weight: 600;
+      color: var(--muted);
+      transition: color .3s;
+    }
+    .step.active { color: var(--accent2); }
+    .step.done   { color: var(--success); }
+    .step-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: .7rem;
+      transition: all .3s;
+    }
+    .step.active .step-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .step.done   .step-num { background: var(--success); border-color: var(--success); color: #fff; }
+    .step-line { flex: 1; height: 1px; background: var(--border2); margin: 0 .5rem; min-width: 20px; }
+    .step-line.done { background: var(--success); }
+
+    /* ── RESULT INFO ── */
+    .result-meta {
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    .meta-chip {
+      display: flex; align-items: center; gap: .35rem;
+      padding: .25rem .65rem;
+      border-radius: 7px;
+      font-size: .75rem;
+      font-weight: 500;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--muted2);
+    }
+    .meta-chip .val { color: var(--text); font-weight: 600; }
+
+    .failed-targets {
+      display: none;
+      background: rgba(244,63,94,.08);
+      border: 1px solid rgba(244,63,94,.22);
+      border-radius: 11px;
+      padding: .8rem;
+      margin-top: .75rem;
+    }
+    .failed-targets.visible { display: block; }
+    .failed-targets-title {
+      color: #fda4af;
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .55rem;
+    }
+    .failed-targets-list {
+      display: flex;
+      flex-direction: column;
+      gap: .45rem;
+      max-height: 180px;
+      overflow: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .74rem;
+      line-height: 1.45;
+    }
+    .failed-target-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: .45rem .6rem;
+      align-items: start;
+      padding-bottom: .45rem;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .failed-target-row:last-child { border-bottom: 0; padding-bottom: 0; }
+    .failed-phase {
+      color: #fecdd3;
+      background: rgba(244,63,94,.12);
+      border: 1px solid rgba(244,63,94,.22);
+      border-radius: 5px;
+      padding: .05rem .35rem;
+      text-transform: uppercase;
+      font-size: .64rem;
+      font-weight: 800;
+    }
+    .failed-url { color: var(--text); word-break: break-all; }
+
+    /* ── LOG CONSOLE ── */
+    .log-console {
+      background: #080b12;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: .75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .74rem;
+      line-height: 1.7;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 220px;
+      max-height: 100%;
+    }
+    .log-entry { display: flex; gap: .6rem; align-items: flex-start; }
+    .log-ts   { color: #3a4560; flex-shrink: 0; }
+    .log-badge {
+      flex-shrink: 0; padding: .05rem .4rem;
+      border-radius: 4px; font-size: .66rem; font-weight: 700;
+    }
+    .log-INFO    { color: #60a5fa; }
+    .log-SUCCESS { color: var(--success); }
+    .log-WARN    { color: var(--warn); }
+    .log-ERROR   { color: var(--error); }
+    .log-badge.INFO    { background: rgba(96,165,250,.12); color: #60a5fa; }
+    .log-badge.SUCCESS { background: rgba(34,211,165,.12); color: var(--success); }
+    .log-badge.WARN    { background: rgba(245,158,11,.12); color: var(--warn); }
+    .log-badge.ERROR   { background: rgba(244,63,94,.12);  color: var(--error); }
+
+    /* ── STATUS TABLE ── */
+    .dispatch-console {
+      background: #080b12;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      overflow: auto;
+      min-height: 180px;
+      max-height: 320px;
+    }
+    .dispatch-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+    }
+    .dispatch-table th {
+      text-align: left; padding: .5rem .75rem;
+      color: var(--muted);
+      font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: #080b12;
+      z-index: 1;
+    }
+    .dispatch-table td { padding: .55rem .75rem; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .dispatch-table tr:hover td { background: rgba(255,255,255,.02); }
+    .dispatch-table td.status-ok     { color: var(--success); }
+    .dispatch-table td.status-failed  { color: var(--error); }
+    .dispatch-table td.status-disabled{ color: var(--muted); }
+
+    /* ── KV EDITOR (cookies / config) ── */
+    .kv-grid { display: grid; grid-template-columns: 1fr 1.5fr auto; gap: .4rem .5rem; align-items: center; }
+    .kv-grid .kv-key  { font-family: 'JetBrains Mono', monospace; font-size: .78rem; }
+    .kv-grid .kv-val  { font-family: 'JetBrains Mono', monospace; font-size: .78rem; }
+    .kv-grid .kv-del  {
+      background: rgba(244,63,94,.1); border: 1px solid rgba(244,63,94,.2);
+      color: var(--error); border-radius: 6px; width: 28px; height: 28px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: .85rem;
+    }
+    .kv-grid .kv-del:hover { background: rgba(244,63,94,.2); }
+
+    /* ── SECTION HIDDEN ── */
+    .tab-section { display: none; }
+    .tab-section.visible { display: contents; }
+
+    /* ── NOTIFICATION TOAST ── */
+    #toast-area { position:fixed; bottom:1.5rem; right:1.5rem; z-index:999; display:flex; flex-direction:column; gap:.5rem; }
+    .toast {
+      padding: .65rem 1.1rem;
+      border-radius: 10px;
+      font-size: .82rem; font-weight: 500;
+      backdrop-filter: blur(10px);
+      animation: slideIn .25s ease;
+      max-width: 320px;
+    }
+    .toast.success { background: rgba(34,211,165,.15); border: 1px solid rgba(34,211,165,.3); color: var(--success); }
+    .toast.error   { background: rgba(244,63,94,.15);  border: 1px solid rgba(244,63,94,.3);  color: var(--error); }
+    .toast.info    { background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3); color: var(--accent2); }
+    @keyframes slideIn { from{ opacity:0; transform:translateX(20px); } to{ opacity:1; transform:translateX(0); } }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    #log-panel {
+      grid-row: 1/3;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── LAYOUT MODES ── */
+    .layout.prod-mode {
+      grid-template-columns: 1fr;
+    }
+
+    .layout.prod-mode #log-panel {
+      grid-row: auto;
+      grid-column: 1 / -1;
+      resize: vertical;
+      overflow: hidden;
+      height: 350px;
+      min-height: 150px;
+    }
+
+    /* ── SELECTION SCREEN ── */
+    .selection-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      flex: 1;
+      padding: 2rem 1rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      animation: fadeIn .35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .selection-hero {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .selection-hero h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff 20%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: .85rem;
+      letter-spacing: -.03em;
+    }
+    .selection-hero p {
+      color: var(--muted2);
+      font-size: 1.05rem;
+      max-width: 650px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .selection-sections {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 3rem;
+      width: 100%;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .selection-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1.75rem;
+    }
+    .selection-group-title {
+      border-bottom: 1px solid var(--border);
+    }
+    .selection-group-title .icon {
+      font-size: 1.3rem;
+    }
+    .selection-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 260px));
+      gap: 1.25rem;
+      justify-content: center;
+    }
+    @media (max-width: 900px) {
+      .selection-grid {
+        grid-template-columns: repeat(2, minmax(0, 260px));
+      }
+    }
+    @media (max-width: 640px) {
+      .selection-grid {
+        grid-template-columns: minmax(0, 260px);
+      }
+    }
+    .selection-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: all .25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .selection-card.active {
+      border-color: rgba(99, 102, 241, 0.25);
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.03);
+    }
+    .selection-card.active:hover {
+      transform: translateY(-4px);
+      border-color: var(--accent);
+      box-shadow: 0 12px 30px var(--glow);
+    }
+    .selection-card.disabled {
+      opacity: 0.5;
+      background: rgba(17, 21, 32, 0.55);
+      border-color: rgba(255, 255, 255, 0.02);
+      cursor: not-allowed;
+    }
+    .selection-card.disabled:hover {
+      opacity: 0.65;
+      border-color: rgba(255, 255, 255, 0.08);
+      background: rgba(17, 21, 32, 0.7);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      transition: all .2s;
+    }
+    .brand-icon {
+      width: 24px;
+      height: 24px;
+      display: block;
+      color: currentColor;
+    }
+    .brand-icon * {
+      stroke: currentColor;
+    }
+    .brand-mark {
+      color: currentColor;
+      font-size: 1.45rem;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    .brand-mark.linkedin-mark {
+      font-size: 1.05rem;
+      font-weight: 900;
+    }
+    .selection-card.active:hover .card-logo {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--glow);
+    }
+    .selection-card.twitter .card-logo {
+      color: #f8fafc;
+    }
+    .selection-card.instagram .card-logo {
+      color: #d62976;
+    }
+    .selection-card.youtube .card-logo {
+      color: #ef4444;
+    }
+    .selection-card.tiktok .card-logo {
+      color: #00f2fe;
+    }
+    .selection-card.threads .card-logo {
+      color: #e5e7eb;
+    }
+    .selection-card.linkedin .card-logo {
+      color: #0a66c2;
+    }
+    .selection-card.facebook .card-logo {
+      color: #1877f2;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .card-subtitle {
+      font-size: .8rem;
+      color: var(--muted2);
+      margin-top: 0.15rem;
+    }
+    .card-badge {
+      padding: .2rem .55rem;
+      border-radius: 6px;
+      font-size: .65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .card-badge.active {
+      background: rgba(34, 211, 165, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(34, 211, 165, 0.2);
+    }
+    .card-badge.locked {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--muted);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    /* Brand accents for styling cards dynamically */
+    .selection-card.active.instagram:hover {
+      border-color: #d62976;
+      box-shadow: 0 12px 30px rgba(214, 41, 118, 0.25);
+    }
+    .selection-card.active.instagram:hover .card-logo {
+      background: linear-gradient(45deg, #fdf497 0%, #fd5949 45%, #d62976 60%, #962fbf 90%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 0 12px rgba(214, 41, 118, 0.4);
+    }
+    .selection-card.active.tiktok:hover {
+      border-color: #00f2fe;
+      box-shadow: 0 12px 30px rgba(0, 242, 254, 0.2);
+    }
+    .selection-card.active.tiktok:hover .card-logo {
+      background: linear-gradient(45deg, #fe0979 0%, #000000 50%, #00f2fe 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+    }
+    .selection-card.active.twitter:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 12px 30px rgba(96, 165, 250, 0.2);
+    }
+    .selection-card.active.twitter:hover .card-logo {
+      background: #111827;
+      color: #fff;
+      border-color: #60a5fa;
+      box-shadow: 0 0 12px rgba(96, 165, 250, 0.35);
+    }
+    .selection-card.active.youtube:hover {
+      border-color: #ef4444;
+      box-shadow: 0 12px 30px rgba(239, 68, 68, 0.2);
+    }
+    .selection-card.active.youtube:hover .card-logo {
+      background: #ef4444;
+      color: #fff;
+      border-color: #ef4444;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+    }
+    .selection-card.active.threads:hover {
+      border-color: #e5e7eb;
+      box-shadow: 0 12px 30px rgba(229, 231, 235, 0.16);
+    }
+    .selection-card.active.threads:hover .card-logo {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e5e7eb;
+      box-shadow: 0 0 12px rgba(229, 231, 235, 0.25);
+    }
+    .selection-card.active.linkedin:hover {
+      border-color: #0a66c2;
+      box-shadow: 0 12px 30px rgba(10, 102, 194, 0.22);
+    }
+    .selection-card.active.linkedin:hover .card-logo {
+      background: #0a66c2;
+      color: #fff;
+      border-color: #0a66c2;
+      box-shadow: 0 0 12px rgba(10, 102, 194, 0.35);
+    }
+    .selection-card.active.facebook:hover {
+      border-color: #1877f2;
+      box-shadow: 0 12px 30px rgba(24, 119, 242, 0.22);
+    }
+    .selection-card.active.facebook:hover .card-logo {
+      background: #1877f2;
+      color: #fff;
+      border-color: #1877f2;
+      box-shadow: 0 0 12px rgba(24, 119, 242, 0.35);
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo" style="cursor: pointer;" onclick="goToSelector()">
+    <div class="logo-icon">🕸️</div>
+    <span>WebInject</span>
+    <span id="header-subtitle" style="color:var(--muted);font-weight:400;margin-left:.1rem; display: none;">/ Instagram</span>
+  </div>
+  
+  <div class="header-badges" id="header-badges" style="display: none;">
+    <div class="badge debug-badge" id="badge-debug" title="Debug Mode">
+      <span class="badge-dot" id="debug-dot"></span> <span id="debug-label">…</span>
+    </div>
+    <div class="badge kafka" id="badge-kafka">
+      <span class="badge-dot"></span> Kafka <span id="kafka-status">…</span>
+    </div>
+    <div class="badge mongo" id="badge-mongo">
+      <span class="badge-dot"></span> Mongo <span id="mongo-status">…</span>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <button id="btn-back-selector" class="btn btn-ghost" style="display: none; padding: .35rem .75rem; font-size: .8rem; align-items: center; gap: .35rem;" onclick="goToSelector()">
+      ◀ Kembali
+    </button>
+    <form method="POST" action="/logout" style="margin:0;">
+      <button class="btn btn-ghost" type="submit" style="padding: .35rem .75rem; font-size: .8rem;">Logout</button>
+    </form>
+  </div>
+</header>
+
+<div class="layout" id="main-layout" style="display: none;">
+
+  <!-- TABS -->
+  <div class="tabs-wrap" style="align-self:start;">
+    <button class="tab-btn"        onclick="switchTab('cookies')" id="tab-cookies">🍪 Cookies</button>
+    <button class="tab-btn"        onclick="switchTab('config')"  id="tab-config">⚙️ Config</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       TAB: INJECT
+  ════════════════════════════════════════ -->
+  <div class="tab-section visible" id="section-inject">
+
+    <!-- LEFT: Inject form -->
+    <div class="panel" style="grid-row:1;">
+
+      <!-- Step indicator -->
+      <div class="steps">
+        <div class="step active" id="step1">
+          <div class="step-num">1</div> Masukkan URL
+        </div>
+        <div class="step-line" id="line1"></div>
+        <div class="step active" id="step2">
+          <div class="step-num">2</div> <span id="step2-label">Preview Data</span>
+        </div>
+        <div class="step-line" id="line2"></div>
+        <div class="step" id="step3">
+          <div class="step-num">3</div> Kirim Kafka
+        </div>
+      </div>
+
+      <!-- URL input -->
+      <div>
+        <label for="url-input">URL / Shortcode Instagram (satu per baris)</label>
+        <textarea id="url-input" class="url-input" placeholder="https://www.instagram.com/p/ABC123/
+https://www.instagram.com/reel/DEF456/
+DZH-sZdoiyZ"></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-crawl" onclick="startCrawl()">
+          <span class="spinner"></span>
+          <span class="btn-label">🔍 Crawl</span>
+        </button>
+        <button class="btn btn-success" id="btn-batch" onclick="startBatchQueue()">
+          <span class="spinner"></span>
+          <span class="btn-label">Auto Queue</span>
+        </button>
+        <button class="btn btn-ghost" id="btn-pause-batch" onclick="pauseBatchQueue()" style="display:none;">
+          <span class="spinner"></span>
+          <span class="btn-label">Pause Queue</span>
+        </button>
+        <button class="btn btn-danger" id="btn-stop-batch" onclick="stopBatchQueue()" style="display:none;">
+          <span class="spinner"></span>
+          <span class="btn-label">Stop Queue</span>
+        </button>
+        <button class="btn btn-ghost" onclick="clearAll()">Bersihkan</button>
+      </div>
+
+      <div id="batch-status-wrap" style="display:none; margin-top:.75rem;">
+        <p class="panel-title" style="margin-bottom:.5rem;">Batch Queue</p>
+        <div class="result-meta" id="batch-meta" style="display:flex;"></div>
+      </div>
+
+      <div class="failed-targets" id="failed-targets-wrap">
+        <p class="failed-targets-title" id="failed-targets-title">URL Gagal</p>
+        <div class="failed-targets-list" id="failed-targets-list"></div>
+      </div>
+
+      <!-- Preview result (hanya tampil saat debug mode) -->
+      <div id="preview-section">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem;">
+          <label style="margin:0;">Preview JSON (edit bebas sebelum kirim)</label>
+          <div class="result-meta" id="result-meta" style="display:none;"></div>
+        </div>
+        <textarea id="result-box" class="result-box" placeholder="Hasil crawling akan tampil di sini…" spellcheck="false"></textarea>
+      </div>
+
+      <div class="btn-row" id="send-btn-row">
+        <button class="btn btn-success" id="btn-send" onclick="sendToKafka()" disabled>
+          <span class="spinner"></span>
+          <span class="btn-label">📤 Kirim ke Kafka</span>
+        </button>
+        <button class="btn btn-ghost" onclick="copyResult()">📋 Salin JSON</button>
+        <button class="btn btn-danger" onclick="clearResult()" id="btn-clear-result" style="display:none;">🗑️ Hapus Hasil</button>
+      </div>
+
+      <!-- Dispatch results table -->
+      <div id="dispatch-wrap" style="display:none;">
+        <p class="panel-title" style="margin-bottom:.5rem;">Hasil Pengiriman</p>
+        <div class="dispatch-console" id="dispatch-console">
+          <table class="dispatch-table" id="dispatch-table">
+            <thead>
+              <tr>
+                <th>No.</th>
+                <th>Shortcode</th>
+                <th>URL</th>
+                <th>Kafka</th>
+                <th>MongoDB</th>
+              </tr>
+            </thead>
+            <tbody id="dispatch-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       TAB: COOKIES
+  ════════════════════════════════════════ -->
+  <div class="tab-section" id="section-cookies">
+    <div class="panel">
+      <p class="panel-title">Cookie Manager</p>
+      <p style="font-size:.8rem;color:var(--muted2);">Cookie di-set sebagai header request ke Instagram. Nilai sensitif — jangan share.</p>
+      <div class="kv-grid" id="cookie-kv"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="switchTab('inject')">Kembali ke Crawl</button>
+        <button class="btn btn-ghost" onclick="addCookieRow()">+ Tambah</button>
+        <button class="btn btn-primary" onclick="saveCookies()">💾 Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       TAB: CONFIG
+  ════════════════════════════════════════ -->
+  <div class="tab-section" id="section-config">
+    <div class="panel">
+      <p class="panel-title">Header Config</p>
+      <p style="font-size:.8rem;color:var(--muted2);">Update jika Instagram memperbarui token/fingerprint. Field ini dikirim sebagai header request.</p>
+      <div class="kv-grid" id="config-kv"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="switchTab('inject')">Kembali ke Crawl</button>
+        <button class="btn btn-primary" onclick="saveConfig()">💾 Simpan Config</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM/RIGHT: Live Log (always visible) -->
+  <div class="panel" id="log-panel">
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <p class="panel-title">Live Log</p>
+      <button class="btn btn-ghost" style="padding:.3rem .7rem; font-size:.75rem;" onclick="clearLog()">Bersihkan</button>
+    </div>
+    <div class="log-console" id="log-console">
+      <div class="log-entry">
+        <span class="log-ts">–</span>
+        <span class="log-badge INFO">INFO</span>
+        <span class="log-INFO">Menunggu koneksi SSE…</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<!-- SELECTION SCREEN -->
+<div class="selection-container" id="selection-view">
+  <div class="selection-hero">
+    <h1>Web Inject Sosial Media</h1>
+    <p>Mempermudah Pekerjaan Anda Untuk Memasukan Data Kedalam Sistem Medmon Kazee</p>
+  </div>
+  
+  <div class="selection-sections">
+    <!-- GROUP 1: BY URL -->
+    <div class="selection-group">
+      <h2 class="selection-group-title">
+      </h2>
+      <div class="selection-grid">
+        <!-- Twitter/X (Active) -->
+        <div class="selection-card active twitter" onclick="selectEngine('twitter_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <span class="brand-mark">X</span>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Twitter/X</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Instagram (Active) -->
+        <div class="selection-card active instagram" onclick="selectEngine('instagram_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="5" fill="none" stroke-width="2"></rect>
+                <circle cx="12" cy="12" r="3.5" fill="none" stroke-width="2"></circle>
+                <circle cx="17" cy="7" r="1.2" fill="currentColor" stroke="none"></circle>
+              </svg>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Instagram</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Facebook (Active) -->
+        <div class="selection-card active facebook" onclick="selectEngine('facebook_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <span class="brand-mark">f</span>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Facebook</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Youtube (Active) -->
+        <div class="selection-card active youtube" onclick="selectEngine('youtube_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="6" width="18" height="12" rx="4" fill="none" stroke-width="2"></rect>
+                <path d="M10 9.5v5l5-2.5-5-2.5z" fill="currentColor" stroke="none"></path>
+              </svg>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Youtube</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Tiktok (Active) -->
+        <div class="selection-card active tiktok" onclick="selectEngine('tiktok_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 4v9.2a4 4 0 1 1-2-3.46V4h2z" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M14 4c1 2.7 2.9 4.4 5 4.8" fill="none" stroke-width="2" stroke-linecap="round"></path>
+              </svg>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Tiktok</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Threads (Active) -->
+        <div class="selection-card active threads" onclick="selectEngine('threads_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <span class="brand-mark">@</span>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Threads</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+
+        <!-- Linkedin (Active) -->
+        <div class="selection-card active linkedin" onclick="selectEngine('linkedin_url')">
+          <div class="card-header">
+            <div class="card-logo">
+              <span class="brand-mark linkedin-mark">in</span>
+            </div>
+            <span class="card-badge active">Aktif</span>
+          </div>
+          <div>
+            <h3 class="card-title">Linkedin</h3>
+            <p class="card-subtitle">Non Login / Cookies</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast-area"></div>
+
+<script>
+// ──────────────────────────────────────────────────────────────
+// SELECTION NAVIGATION LOGIC
+// ──────────────────────────────────────────────────────────────
+let currentEngine = 'instagram';
+let currentBatchJobId = null;
+let currentBatchStatus = null;
+let dispatchRowOffset = 0;
+
+const engineConfig = {
+  instagram: {
+    subtitle: '/ Instagram',
+    label: 'URL / Shortcode Instagram (satu per baris)',
+    placeholder: 'https://www.instagram.com/p/ABC123/\nhttps://www.instagram.com/reel/DEF456/\nDZH-sZdoiyZ',
+    crawlUrl: '/api/crawl',
+    sendUrl: '/api/send',
+    crawlAndSendUrl: '/api/crawl-and-send',
+    showCookiesConfig: true,
+  },
+  tiktok: {
+    subtitle: '/ Tiktok',
+    label: 'URL / Link TikTok (satu per baris)',
+    placeholder: 'https://www.tiktok.com/@username/video/1234567890123456789\nhttps://www.tiktok.com/@username/photo/9876543210987654321',
+    crawlUrl: '/api/tiktok/crawl',
+    sendUrl: '/api/tiktok/send',
+    crawlAndSendUrl: '/api/tiktok/crawl-and-send',
+    showCookiesConfig: false,
+  },
+  twitter: {
+    subtitle: '/ Twitter/X',
+    label: 'URL / Link Twitter/X (satu per baris)',
+    placeholder: 'https://x.com/username/status/1234567890123456789\nhttps://twitter.com/username/status/1234567890123456789',
+    crawlUrl: '/api/twitter/crawl',
+    sendUrl: '/api/twitter/send',
+    crawlAndSendUrl: '/api/twitter/crawl-and-send',
+    showCookiesConfig: false,
+  },
+  youtube: {
+    subtitle: '/ YouTube',
+    label: 'URL / Link YouTube (satu per baris)',
+    placeholder: 'https://www.youtube.com/watch?v=VIDEO_ID\nhttps://youtu.be/VIDEO_ID\nhttps://www.youtube.com/shorts/VIDEO_ID',
+    crawlUrl: '/api/youtube/crawl',
+    sendUrl: '/api/youtube/send',
+    crawlAndSendUrl: '/api/youtube/crawl-and-send',
+    showCookiesConfig: false,
+  },
+  threads: {
+    subtitle: '/ Threads',
+    label: 'URL / Link Threads (satu per baris)',
+    placeholder: 'https://www.threads.net/@username/post/POST_ID\nhttps://www.threads.com/@username/post/POST_ID',
+    crawlUrl: '/api/threads/crawl',
+    sendUrl: '/api/threads/send',
+    crawlAndSendUrl: '/api/threads/crawl-and-send',
+    showCookiesConfig: false,
+  },
+  linkedin: {
+    subtitle: '/ Linkedin',
+    label: 'URL / Link Linkedin (satu per baris)',
+    placeholder: 'https://www.linkedin.com/posts/username_activity-1234567890123456789\nhttps://www.linkedin.com/posts/company-slug-1234567890123456789-ABCD',
+    crawlUrl: '/api/linkedin/crawl',
+    sendUrl: '/api/linkedin/send',
+    crawlAndSendUrl: '/api/linkedin/crawl-and-send',
+    showCookiesConfig: false,
+  },
+  facebook: {
+    subtitle: '/ Facebook',
+    label: 'URL / Link Facebook (satu per baris, opsional: URL | keyword)',
+    placeholder: 'https://www.facebook.com/KOMPAScom/videos/988145990824718/\nhttps://www.facebook.com/story.php?story_fbid=123&id=456 | Nasionalisme',
+    crawlUrl: '/api/facebook/crawl',
+    sendUrl: '/api/facebook/send',
+    crawlAndSendUrl: '/api/facebook/crawl-and-send',
+    showCookiesConfig: false,
+  },
+};
+
+function getCrawlUrl() {
+  return engineConfig[currentEngine].crawlUrl;
+}
+function getSendUrl() {
+  return engineConfig[currentEngine].sendUrl;
+}
+function getCrawlAndSendUrl() {
+  return engineConfig[currentEngine].crawlAndSendUrl;
+}
+
+function selectEngine(engineId) {
+  const subtitleEl = document.getElementById('header-subtitle');
+  const urlLabelEl = document.querySelector('label[for="url-input"]');
+  const urlInputEl = document.getElementById('url-input');
+  const engine = engineId.replace('_url', '');
+  const cfg = engineConfig[engine];
+  if (!cfg) return lockedEngine(engineId);
+
+  currentEngine = engine;
+  subtitleEl.textContent = cfg.subtitle;
+  urlLabelEl.textContent = cfg.label;
+  urlInputEl.placeholder = cfg.placeholder;
+
+  document.getElementById('tab-cookies').style.display = cfg.showCookiesConfig ? '' : 'none';
+  document.getElementById('tab-config').style.display = cfg.showCookiesConfig ? '' : 'none';
+  switchTab('inject');
+
+  toast(`Memuat modul ${cfg.subtitle.replace('/ ', '')} (Non Login / cookies)...`, 'success');
+
+  // Show main layout & configure headers
+  document.getElementById('selection-view').style.display = 'none';
+  document.getElementById('main-layout').style.display = 'grid';
+  subtitleEl.style.display = 'inline';
+  document.getElementById('header-badges').style.display = 'flex';
+  document.getElementById('btn-back-selector').style.display = 'inline-flex';
+  
+  clearAll();
+  applyDebugMode();
+}
+
+function goToSelector() {
+  document.getElementById('selection-view').style.display = 'flex';
+  document.getElementById('main-layout').style.display = 'none';
+  document.getElementById('header-subtitle').style.display = 'none';
+  document.getElementById('header-badges').style.display = 'none';
+  document.getElementById('btn-back-selector').style.display = 'none';
+}
+
+function lockedEngine(name) {
+  toast(`Engine ${name} masih dalam tahap pengembangan!`, 'info');
+}
+
+// ──────────────────────────────────────────────────────────────
+// SSE
+// ──────────────────────────────────────────────────────────────
+let es;
+function connectSSE() {
+  if (es) es.close();
+  es = new EventSource('/api/stream');
+  es.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'log') appendLog(msg);
+    if (msg.type === 'dispatch_result') appendDispatchRow(msg);
+    if (msg.type === 'batch_update') renderBatchStatus(msg);
+  };
+  es.onerror = () => {
+    appendLog({ level:'WARN', msg:'SSE disconnected, retrying…', ts: nowStr() });
+    setTimeout(connectSSE, 3000);
+  };
+  es.onopen = () => appendLog({ level:'INFO', msg:'SSE connected ✓', ts: nowStr() });
+}
+
+function nowStr() {
+  return new Date(Date.now() + 7*3600000).toISOString().replace('T',' ').slice(0,19);
+}
+
+// ──────────────────────────────────────────────────────────────
+// STATUS BADGES
+// ──────────────────────────────────────────────────────────────
+let debugMode = true; // akan di-update dari server
+
+async function pollStatus() {
+  try {
+    const r = await fetch('/api/status').then(r => r.json());
+    document.getElementById('kafka-status').textContent = r.kafka;
+    document.getElementById('mongo-status').textContent = r.mongo;
+
+    // Update debug badge
+    debugMode = r.debugMode !== false;
+    const dbadge = document.getElementById('badge-debug');
+    const dlabel = document.getElementById('debug-label');
+    const ddot   = document.getElementById('debug-dot');
+    dbadge.classList.remove('is-debug','is-prod');
+    if (debugMode) {
+      dbadge.classList.add('is-debug');
+      dlabel.textContent = 'DEBUG';
+      ddot.title = 'Debug mode aktif — preview JSON tampil, kirim manual';
+    } else {
+      dbadge.classList.add('is-prod');
+      dlabel.textContent = 'PROD';
+      ddot.title = 'Production mode — auto kirim ke Kafka';
+    }
+
+    applyDebugMode();
+  } catch (_) {}
+  setTimeout(pollStatus, 5000);
+}
+
+function applyDebugMode() {
+  const previewSec  = document.getElementById('preview-section');
+  const sendBtnRow  = document.getElementById('send-btn-row');
+  const step2label  = document.getElementById('step2-label');
+  const mainLayout  = document.getElementById('main-layout');
+  const logPanel    = document.getElementById('log-panel');
+  const crawlLabel  = document.querySelector('#btn-crawl .btn-label');
+  const batchBtn    = document.getElementById('btn-batch');
+  const pauseBtn    = document.getElementById('btn-pause-batch');
+  const stopBtn     = document.getElementById('btn-stop-batch');
+
+  if (debugMode) {
+    previewSec.style.display = '';
+    sendBtnRow.style.display = '';
+    batchBtn.style.display = '';
+    if (!currentBatchJobId && pauseBtn) pauseBtn.style.display = 'none';
+    if (!currentBatchJobId && stopBtn) stopBtn.style.display = 'none';
+    crawlLabel.textContent = '🔍 Crawl Preview';
+    step2label.textContent   = 'Preview Data';
+    mainLayout.classList.remove('prod-mode');
+    logPanel.style.height    = ''; // Reset inline height when switching back
+  } else {
+    previewSec.style.display = 'none';
+    sendBtnRow.style.display = 'none';
+    batchBtn.style.display = 'none';
+    if (!currentBatchJobId && pauseBtn) pauseBtn.style.display = 'none';
+    if (!currentBatchJobId && stopBtn) stopBtn.style.display = 'none';
+    crawlLabel.textContent = 'Auto Queue';
+    step2label.textContent   = 'Auto-Send';
+    mainLayout.classList.add('prod-mode');
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// TABS
+// ──────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  ['inject','cookies','config'].forEach(t => {
+    document.getElementById(`section-${t}`).classList.toggle('visible', t === tab);
+    const tabButton = document.getElementById(`tab-${t}`);
+    if (tabButton) tabButton.classList.toggle('active', t === tab);
+  });
+  if (tab === 'cookies') loadCookies();
+  if (tab === 'config')  loadConfig();
+}
+
+// ──────────────────────────────────────────────────────────────
+// LOG
+// ──────────────────────────────────────────────────────────────
+function appendLog({ level, msg, ts }) {
+  const c = document.getElementById('log-console');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-ts">${ts||''}</span><span class="log-badge ${level}">${level}</span><span class="log-${level}">${escHtml(msg)}</span>`;
+  c.appendChild(div);
+  c.scrollTop = c.scrollHeight;
+}
+function clearLog() { document.getElementById('log-console').innerHTML = ''; }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ──────────────────────────────────────────────────────────────
+// STEP INDICATOR
+// ──────────────────────────────────────────────────────────────
+function setStep(n) {
+  // n = 1, 2, or 3
+  for (let i = 1; i <= 3; i++) {
+    const s = document.getElementById(`step${i}`);
+    s.classList.remove('active','done');
+    if (i < n)  s.classList.add('done');
+    if (i === n) s.classList.add('active');
+  }
+  for (let i = 1; i <= 2; i++) {
+    const l = document.getElementById(`line${i}`);
+    l.classList.toggle('done', i < n);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// CRAWL
+// ──────────────────────────────────────────────────────────────
+let crawledItems = [];
+
+async function startCrawl() {
+  const raw = document.getElementById('url-input').value.trim();
+  if (!raw) return toast('Masukkan setidaknya 1 URL / shortcode', 'error');
+
+  const urls = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  setBtnLoading('btn-crawl', true);
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('result-box').value = '';
+  document.getElementById('result-box').classList.remove('has-data');
+  document.getElementById('result-meta').style.display = 'none';
+  document.getElementById('dispatch-wrap').style.display = 'none';
+  renderFailedTargets([]);
+  document.getElementById('btn-clear-result').style.display = 'none';
+  document.getElementById('dispatch-body').innerHTML = '';
+  crawledItems = [];
+  setStep(1);
+
+  // ── NON-DEBUG: masuk batch queue, auto-send per URL ──
+  if (!debugMode) {
+    await startBatchQueue('btn-crawl', urls);
+    return;
+  }
+
+  // ── DEBUG: tampilkan preview JSON, kirim manual ──
+  try {
+    const res = await fetch(getCrawlUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+    });
+    const data = await res.json();
+    renderFailedTargets(data.failedTargets || []);
+    if (!data.ok) throw new Error(data.error || 'Unknown error');
+
+    crawledItems = data.items || [];
+    const box = document.getElementById('result-box');
+    box.value = JSON.stringify(crawledItems, null, 2);
+    box.classList.add('has-data');
+
+    // Meta chips
+    const meta = document.getElementById('result-meta');
+    meta.style.display = 'flex';
+    
+    let userLabel = '';
+    let likeLabel = '';
+    let viewLabel = '';
+    
+    if (crawledItems[0]) {
+      if (currentEngine === 'instagram') {
+        userLabel = crawledItems[0]?.user?.username || '–';
+        likeLabel = (crawledItems[0]?.like_count ?? '–').toLocaleString();
+        viewLabel = (crawledItems[0]?.view_count ?? '–').toLocaleString();
+      } else {
+        userLabel = crawledItems[0]?.owner?.username || '–';
+        likeLabel = (crawledItems[0]?.like_count?.number ?? '–').toLocaleString();
+        viewLabel = (crawledItems[0]?.view_count?.number ?? '–').toLocaleString();
+      }
+    }
+    
+    meta.innerHTML = `
+      <div class="meta-chip">Items <span class="val">${crawledItems.length}</span></div>
+      ${(data.failedTargets || []).length ? `<div class="meta-chip">Gagal <span class="val">${(data.failedTargets || []).length}</span></div>` : ''}
+      ${crawledItems[0] ? `<div class="meta-chip">User <span class="val">@${userLabel}</span></div>` : ''}
+      ${crawledItems[0] ? `<div class="meta-chip">❤️ <span class="val">${likeLabel}</span></div>` : ''}
+      ${crawledItems[0] ? `<div class="meta-chip">👁 <span class="val">${viewLabel}</span></div>` : ''}
+    `;
+
+    document.getElementById('btn-send').disabled = crawledItems.length === 0;
+    document.getElementById('btn-clear-result').style.display = crawledItems.length > 0 ? '' : 'none';
+    setStep(2);
+    toast(`✓ ${crawledItems.length} item(s) berhasil di-fetch. Cek preview lalu kirim.`, 'success');
+  } catch (e) {
+    toast('Crawl gagal: ' + e.message, 'error');
+    appendLog({ level:'ERROR', msg:'Crawl error: ' + e.message, ts: nowStr() });
+  } finally {
+    setBtnLoading('btn-crawl', false);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// BATCH QUEUE
+// ──────────────────────────────────────────────────────────────
+async function startBatchQueue(buttonId = 'btn-batch', providedUrls = null) {
+  const raw = document.getElementById('url-input').value.trim();
+  if (!providedUrls && !raw) return toast('Masukkan setidaknya 1 URL / shortcode', 'error');
+
+  const urls = providedUrls || raw.split('\n').map(s => s.trim()).filter(Boolean);
+  let shouldResume = currentBatchJobId && currentBatchStatus === 'paused';
+  if (!shouldResume) {
+    try {
+      const jobsData = await fetch('/api/batch').then(r => r.json());
+      shouldResume = !!jobsData.jobs?.some(job => job.engine === currentEngine && job.status === 'paused');
+    } catch (_) {}
+  }
+
+  setBtnLoading(buttonId, true);
+  document.getElementById('dispatch-wrap').style.display = '';
+  if (!shouldResume) {
+    document.getElementById('dispatch-body').innerHTML = '';
+    dispatchRowOffset = 0;
+  }
+  document.getElementById('batch-status-wrap').style.display = '';
+  setStep(3);
+
+  try {
+    const res = await fetch('/api/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine: currentEngine, urls, autoSend: true, resumePaused: true }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Batch queue failed');
+
+    currentBatchJobId = data.job.id;
+    if (data.resumed && !document.getElementById('dispatch-body').children.length) {
+      dispatchRowOffset = data.job.processed || 0;
+    }
+    renderBatchStatus(data.job);
+    toast(data.resumed ? `Batch job dilanjutkan: ${data.job.id}` : `Batch job dibuat: ${data.job.total} URL`, 'success');
+    appendLog({ level:'INFO', msg:`Batch job ${data.resumed ? 'dilanjutkan' : 'dibuat'}: ${data.job.id} untuk ${data.job.label}`, ts: nowStr() });
+  } catch (e) {
+    toast('Batch queue gagal: ' + e.message, 'error');
+    appendLog({ level:'ERROR', msg:'Batch queue error: ' + e.message, ts: nowStr() });
+  } finally {
+    setBtnLoading(buttonId, false);
+  }
+}
+
+function renderBatchStatus(job) {
+  if (!job || (currentBatchJobId && job.id !== currentBatchJobId)) return;
+  currentBatchJobId = job.id;
+  currentBatchStatus = job.status;
+
+  const wrap = document.getElementById('batch-status-wrap');
+  const meta = document.getElementById('batch-meta');
+  const pauseBtn = document.getElementById('btn-pause-batch');
+  const stopBtn = document.getElementById('btn-stop-batch');
+  if (!wrap || !meta) return;
+
+  wrap.style.display = '';
+  const percent = job.total ? Math.round((job.processed / job.total) * 100) : 0;
+  const terminalStatuses = ['completed', 'completed_with_errors', 'failed', 'stopped'];
+  meta.innerHTML = `
+    <div class="meta-chip">Job <span class="val">${job.id}</span></div>
+    <div class="meta-chip">Status <span class="val">${job.status}</span></div>
+    <div class="meta-chip">Progress <span class="val">${job.processed}/${job.total} (${percent}%)</span></div>
+    <div class="meta-chip">Berhasil <span class="val">${job.success}</span></div>
+    <div class="meta-chip">Gagal <span class="val">${job.failed}</span></div>
+    <div class="meta-chip">Send Failed <span class="val">${job.sendFailed || 0}</span></div>
+    <div class="meta-chip">Sent <span class="val">${job.itemsSent}</span></div>
+  `;
+
+  if (terminalStatuses.includes(job.status)) {
+    renderFailedTargets(job.failedTargets || [], `URL Gagal - ${job.label}`);
+    setBtnLoading('btn-batch', false);
+    setBtnLoading('btn-crawl', false);
+    if (pauseBtn) pauseBtn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'none';
+  } else if (job.status === 'running' || job.status === 'queued') {
+    renderFailedTargets([]);
+    if (pauseBtn) pauseBtn.style.display = '';
+    if (stopBtn) stopBtn.style.display = '';
+  } else if (job.status === 'paused') {
+    if (pauseBtn) pauseBtn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = '';
+    setBtnLoading('btn-batch', false);
+    setBtnLoading('btn-crawl', false);
+  } else if (job.status === 'stopping') {
+    if (pauseBtn) pauseBtn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = '';
+    setBtnLoading('btn-batch', false);
+    setBtnLoading('btn-crawl', false);
+  }
+}
+
+function normalizeFailedTarget(entry) {
+  if (entry && typeof entry === 'object') {
+    return {
+      url: entry.url || entry.link || entry.id || '-',
+      error: entry.error || entry.message || '',
+      phase: entry.phase || 'crawl',
+    };
+  }
+
+  return {
+    url: String(entry || '-'),
+    error: '',
+    phase: 'crawl',
+  };
+}
+
+function renderFailedTargets(targets = [], title = 'URL Gagal') {
+  const wrap = document.getElementById('failed-targets-wrap');
+  const titleEl = document.getElementById('failed-targets-title');
+  const list = document.getElementById('failed-targets-list');
+  if (!wrap || !titleEl || !list) return;
+
+  const normalized = (targets || []).map(normalizeFailedTarget).filter(item => item.url && item.url !== '-');
+  if (!normalized.length) {
+    wrap.classList.remove('visible');
+    list.innerHTML = '';
+    return;
+  }
+
+  titleEl.textContent = `${title} (${normalized.length})`;
+  list.innerHTML = normalized.map(item => `
+    <div class="failed-target-row">
+      <span class="failed-phase">${escHtml(item.phase || 'crawl')}</span>
+      <span class="failed-url">${escHtml(item.url)}</span>
+    </div>
+  `).join('');
+  wrap.classList.add('visible');
+}
+
+async function pauseBatchQueue() {
+  if (!currentBatchJobId) return toast('Tidak ada batch job aktif untuk di-pause', 'error');
+
+  setBtnLoading('btn-pause-batch', true);
+  try {
+    const res = await fetch(`/api/batch/${currentBatchJobId}/pause`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Pause failed');
+    renderBatchStatus(data.job);
+    toast('Pause diminta. Job akan berhenti setelah URL saat ini selesai.', 'info');
+  } catch (e) {
+    toast('Pause gagal: ' + e.message, 'error');
+  } finally {
+    setBtnLoading('btn-pause-batch', false);
+  }
+}
+
+async function stopBatchQueue() {
+  if (!currentBatchJobId) return toast('Tidak ada batch job aktif untuk di-stop', 'error');
+
+  setBtnLoading('btn-stop-batch', true);
+  try {
+    const res = await fetch(`/api/batch/${currentBatchJobId}/stop`, { method: 'POST' });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Stop failed');
+    renderBatchStatus(data.job);
+    toast('Stop diminta. Job akan berhenti dengan aman setelah URL saat ini selesai.', 'info');
+  } catch (e) {
+    toast('Stop gagal: ' + e.message, 'error');
+  } finally {
+    setBtnLoading('btn-stop-batch', false);
+  }
+}
+
+async function pollBatchStatus() {
+  if (currentBatchJobId) {
+    try {
+      const res = await fetch(`/api/batch/${currentBatchJobId}`);
+      const data = await res.json();
+      if (data.ok) renderBatchStatus(data.job);
+    } catch (_) {}
+  }
+  setTimeout(pollBatchStatus, 5000);
+}
+
+// ──────────────────────────────────────────────────────────────
+// SEND TO KAFKA
+// ──────────────────────────────────────────────────────────────
+async function sendToKafka() {
+  let items;
+  try {
+    items = JSON.parse(document.getElementById('result-box').value);
+    if (!Array.isArray(items)) items = [items]; // tolerate single object
+  } catch(e) {
+    return toast('JSON tidak valid: ' + e.message, 'error');
+  }
+
+  if (!items.length) return toast('Tidak ada item untuk dikirim', 'error');
+
+  setBtnLoading('btn-send', true);
+  document.getElementById('dispatch-wrap').style.display = '';
+  document.getElementById('dispatch-body').innerHTML = '';
+  setStep(3);
+
+  try {
+    const res = await fetch(getSendUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Send failed');
+    if (!document.getElementById('dispatch-body').children.length) {
+      (data.results || []).forEach(appendDispatchRow);
+    }
+    const failedSendTargets = (data.results || [])
+      .filter(result => result?.kafka === 'failed' || result?.mongo === 'failed')
+      .map(result => ({
+        url: result.url || result.id || result.shortcode,
+        error: result.kafkaError || result.mongoError || 'Send failed',
+        phase: 'send',
+      }));
+    renderFailedTargets(failedSendTargets, 'URL Gagal Dikirim');
+    toast(`📤 ${data.results.length} item(s) dikirim!`, 'success');
+  } catch (e) {
+    toast('Kirim gagal: ' + e.message, 'error');
+  } finally {
+    setBtnLoading('btn-send', false);
+  }
+}
+
+function appendDispatchRow(r) {
+  const tbody = document.getElementById('dispatch-body');
+  const tr = document.createElement('tr');
+  const cls = s => ['sent', 'saved', 'updated', 'exists'].includes(s) ? 'status-ok' : ['disabled', 'skipped', 'no_topic'].includes(s) ? 'status-disabled' : 'status-failed';
+  const rowNumber = dispatchRowOffset + tbody.children.length + 1;
+  const displayUrl = r.url || r.id || '–';
+  tr.innerHTML = `
+    <td><code>${rowNumber}</code></td>
+    <td><code>${r.shortcode || '–'}</code></td>
+    <td><code title="${escHtml(displayUrl)}" style="color:var(--muted2);font-size:.72rem;">${escHtml(displayUrl.toString().slice(0,42))}</code></td>
+    <td class="${cls(r.kafka)}">${r.kafka || '–'}</td>
+    <td class="${cls(r.mongo)}">${r.mongo || '–'}</td>
+  `;
+  tbody.appendChild(tr);
+  const box = document.getElementById('dispatch-console');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+// ──────────────────────────────────────────────────────────────
+// UTIL
+// ──────────────────────────────────────────────────────────────
+function clearAll() {
+  document.getElementById('url-input').value = '';
+  clearResult();
+}
+function clearResult() {
+  document.getElementById('result-box').value = '';
+  document.getElementById('result-box').classList.remove('has-data');
+  document.getElementById('result-meta').style.display = 'none';
+  document.getElementById('btn-send').disabled = true;
+  document.getElementById('btn-clear-result').style.display = 'none';
+  document.getElementById('dispatch-wrap').style.display = 'none';
+  document.getElementById('batch-status-wrap').style.display = 'none';
+  renderFailedTargets([]);
+  document.getElementById('btn-pause-batch').style.display = 'none';
+  document.getElementById('btn-stop-batch').style.display = 'none';
+  currentBatchJobId = null;
+  currentBatchStatus = null;
+  dispatchRowOffset = 0;
+  crawledItems = [];
+  setStep(1);
+}
+function copyResult() {
+  const v = document.getElementById('result-box').value;
+  if (!v) return toast('Tidak ada data', 'error');
+  navigator.clipboard.writeText(v).then(() => toast('JSON disalin!', 'success'));
+}
+
+function setBtnLoading(id, on) {
+  const btn = document.getElementById(id);
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
+}
+
+function toast(msg, type='info') {
+  const area = document.getElementById('toast-area');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  area.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ──────────────────────────────────────────────────────────────
+// COOKIES
+// ──────────────────────────────────────────────────────────────
+async function loadCookies() {
+  const data = await fetch('/api/cookies').then(r => r.json());
+  renderKV('cookie-kv', data, 'cookie');
+}
+async function saveCookies() {
+  const data = readKV('cookie-kv');
+  await fetch('/api/cookies', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  toast('Cookies disimpan ✓', 'success');
+}
+function addCookieRow() {
+  addKVRow('cookie-kv', '', '', 'cookie');
+}
+
+// ──────────────────────────────────────────────────────────────
+// CONFIG
+// ──────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const data = await fetch('/api/config').then(r => r.json());
+  renderKV('config-kv', data, 'cfg');
+}
+async function saveConfig() {
+  const data = readKV('config-kv');
+  await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  toast('Config disimpan ✓', 'success');
+}
+
+// ── Generic KV renderer ─────────────────────────────────────
+function renderKV(containerId, obj, prefix) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  Object.entries(obj).forEach(([k, v]) => addKVRow(containerId, k, v, prefix));
+}
+function addKVRow(containerId, k, v, prefix) {
+  const el = document.getElementById(containerId);
+  const uid = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const div = document.createElement('div');
+  div.style.display = 'contents';
+  div.innerHTML = `
+    <input type="text" class="kv-key" data-uid="${uid}" placeholder="key" value="${escHtml(k)}" />
+    <input type="text" class="kv-val" data-uid="${uid}" placeholder="value" value="${escHtml(String(v))}" />
+    <button class="kv-del" title="Hapus" onclick="this.parentElement.remove()">✕</button>
+  `;
+  el.appendChild(div);
+}
+function readKV(containerId) {
+  const el = document.getElementById(containerId);
+  const keys = el.querySelectorAll('.kv-key');
+  const vals = el.querySelectorAll('.kv-val');
+  const obj = {};
+  keys.forEach((k, i) => { if (k.value.trim()) obj[k.value.trim()] = vals[i].value; });
+  return obj;
+}
+
+// ──────────────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────────────
+connectSSE();
+pollStatus();
+pollBatchStatus();
+</script>
+</body>
+</html>
